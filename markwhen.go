@@ -10,8 +10,9 @@ import (
 const (
 	keyValueSeparator = ":"
 
-	prefixComment = "//"
-	prefixTitle   = "title:"
+	prefixComment     = "//"
+	prefixTitle       = "title:"
+	prefixDescription = "description:"
 )
 
 type Color = string
@@ -48,7 +49,12 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 			continue
 		}
 		if strings.HasPrefix(line, prefixTitle) {
-			if header.Title, err = getTitle(line); err != nil {
+			if header.Title, err = getMetaValue(line); err != nil {
+				return nil, err
+			}
+		}
+		if strings.HasPrefix(line, prefixDescription) {
+			if header.Description, err = getMetaValue(line); err != nil {
 				return nil, err
 			}
 		}
@@ -62,8 +68,4 @@ func getMetaValue(line string) (string, error) {
 		return "", fmt.Errorf("invalid meta value")
 	}
 	return strings.TrimSpace(line[index+1:]), nil
-}
-
-func getTitle(line string) (string, error) {
-	return getMetaValue(line)
 }

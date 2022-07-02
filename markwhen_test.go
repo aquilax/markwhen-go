@@ -25,6 +25,12 @@ func TestParse(t *testing.T) {
 			&MarkWhen{&Header{Title: "This is a title", Tags: make(Tags)}},
 			false,
 		},
+		{
+			"parses description",
+			"description: This is a description",
+			&MarkWhen{&Header{Description: "This is a description", Tags: make(Tags)}},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
