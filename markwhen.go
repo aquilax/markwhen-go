@@ -11,6 +11,7 @@ import (
 const (
 	keyValueSeparator  = ":"
 	dateRangeSeparator = "-"
+	pageBreak          = "_-_-_break_-_-_"
 
 	prefixComment     = "//"
 	prefixTitle       = "title:"
@@ -52,9 +53,20 @@ type Event struct {
 	Body string
 }
 
-type MarkWhen struct {
+type Page struct {
 	Header *Header
 	Events []*Event
+}
+
+func NewPage() *Page {
+	return &Page{
+		NewHeader(),
+		make([]*Event, 0),
+	}
+}
+
+type MarkWhen struct {
+	Pages []*Page
 }
 
 func Parse(reader io.Reader) (*MarkWhen, error) {
@@ -63,8 +75,8 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 	var trimmedLine string
 	scanner := bufio.NewScanner(reader)
 	lineNumber := 0
-	header := NewHeader()
-	events := make([]*Event, 0)
+	pages := make([]*Page, 0)
+	page := NewPage()
 	inHeader := true
 	for scanner.Scan() {
 		lineNumber++
@@ -78,34 +90,42 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 			// ignore empty lines
 			continue
 		}
+		if line == pageBreak {
+			oldDateFormat := page.Header.DateFormat
+			pages = append(pages, page)
+			page = NewPage()
+			page.Header.DateFormat = oldDateFormat
+			continue
+		}
 		if inHeader {
 			if strings.HasPrefix(line, prefixTitle) {
-				if _, header.Title, err = getKeyValue(line); err != nil {
+				if _, page.Header.Title, err = getKeyValue(line); err != nil {
 					return nil, err
 				}
 				continue
 			}
 			if strings.HasPrefix(line, prefixDescription) {
-				if _, header.Description, err = getKeyValue(line); err != nil {
+				if _, page.Header.Description, err = getKeyValue(line); err != nil {
 					return nil, err
 				}
 				continue
 			}
 			if strings.HasPrefix(line, prefixDateFormat) {
-				if header.DateFormat, err = getDateFormatValue(line); err != nil {
+				if page.Header.DateFormat, err = getDateFormatValue(line); err != nil {
 					return nil, err
 				}
 				continue
 			}
 		}
-		if event, err := getEvent(line, header); err != nil {
+		if event, err := getEvent(line, page.Header); err != nil {
 			return nil, err
 		} else {
-			events = append(events, event)
+			page.Events = append(page.Events, event)
 			continue
 		}
 	}
-	return &MarkWhen{header, events}, nil
+	pages = append(pages, page)
+	return &MarkWhen{pages}, nil
 }
 
 func getKeyValue(line string) (string, string, error) {
@@ -141,6 +161,14 @@ func getEvent(line string, header *Header) (*Event, error) {
 	return &Event{from, to, value}, nil
 }
 
+func parseTime(dateFormat string, t string) (time.Time, error) {
+	trimmedLine := strings.TrimSpace(t)
+	if trimmedLine == "now" {
+		return time.Time{}, nil
+	}
+	return time.Parse(dateFormat, trimmedLine)
+}
+
 func getRange(dateRange string, header *Header) (time.Time, time.Time, error) {
 	var err error
 	fromTime := time.Time{}
@@ -150,11 +178,11 @@ func getRange(dateRange string, header *Header) (time.Time, time.Time, error) {
 		// single date
 	} else {
 		// date range
-		fromTime, err = time.Parse(header.DateFormat, strings.TrimSpace(dateRange[:index]))
+		fromTime, err = parseTime(header.DateFormat, dateRange[:index])
 		if err != nil {
 			return fromTime, toTime, err
 		}
-		toTime, err = time.Parse(header.DateFormat, strings.TrimSpace(dateRange[index+1:]))
+		toTime, err = parseTime(header.DateFormat, dateRange[index+1:])
 		if err != nil {
 			return fromTime, toTime, err
 		}
