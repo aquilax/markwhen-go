@@ -5,11 +5,20 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func marshal(mw *MarkWhen) string {
 	b, _ := json.Marshal(mw)
 	return string(b)
+}
+
+func mustParseTime(t string) time.Time {
+	result, err := time.Parse(time.RFC3339, t)
+	if err != nil {
+		panic(err)
+	}
+	return result
 }
 
 func TestParse(t *testing.T) {
@@ -22,13 +31,40 @@ func TestParse(t *testing.T) {
 		{
 			"parses title",
 			"title: This is a title",
-			&MarkWhen{&Header{Title: "This is a title", Tags: make(Tags)}},
+			&MarkWhen{&Header{Title: "This is a title", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
 			false,
 		},
 		{
 			"parses description",
 			"description: This is a description",
-			&MarkWhen{&Header{Description: "This is a description", Tags: make(Tags)}},
+			&MarkWhen{&Header{Description: "This is a description", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
+			false,
+		},
+		{
+			"EU Date example",
+			`// To indicate we are using European date formatting
+dateFormat: d/M/y
+
+// 2 weeks
+01/01/2023 - 14/01/2023: Phase 1 #Exploratory
+
+// Another 2 weeks
+15/01/2023 - 31/01/2023: Phase 2 #Implementation
+
+// 3 days, after a one week buffer
+07/03/2023 - 10/03/2023: Phase 4 - kickoff! #Launch
+`,
+			&MarkWhen{
+				&Header{
+					DateFormat: euDateFormat,
+					Tags:       make(Tags),
+				},
+				[]*Event{
+					{From: mustParseTime("2023-01-01T00:00:00Z"), To: mustParseTime("2023-01-14T00:00:00Z"), Body: "Phase 1 #Exploratory"},
+					{From: mustParseTime("2023-01-15T00:00:00Z"), To: mustParseTime("2023-01-31T00:00:00Z"), Body: "Phase 2 #Implementation"},
+					{From: mustParseTime("2023-03-07T00:00:00Z"), To: mustParseTime("2023-03-10T00:00:00Z"), Body: "Phase 4 - kickoff! #Launch"},
+				},
+			},
 			false,
 		},
 	}
