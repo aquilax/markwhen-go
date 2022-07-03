@@ -18,8 +18,21 @@ const (
 	prefixDescription = "description:"
 	prefixDateFormat  = "dateFormat:"
 
+	prefixGroupStart   = "group "
+	prefixGroupStop    = "endGroup"
+	prefixSectionStart = "section"
+	prefixSectionStop  = "endSection"
+
 	usDateFormat = "01/02/2006" // MM/dd/yy
 	euDateFormat = "02/01/2006" // MM/dd/yy
+)
+
+type CollectionType string
+
+const (
+	CollectionFree    CollectionType = ""
+	CollectionGroup   CollectionType = "group"
+	CollectionSection CollectionType = "section"
 )
 
 var knownDateFormats = map[string]string{
@@ -29,9 +42,9 @@ var knownDateFormats = map[string]string{
 
 const DefaultDateFormat = usDateFormat
 
+type Tag = string
 type Color = string
-
-type Tags map[string]Color
+type Tags map[Tag]Color
 
 type Header struct {
 	Title       string
@@ -47,6 +60,21 @@ func NewHeader() *Header {
 	}
 }
 
+type Collection struct {
+	Type      CollectionType
+	Collapsed bool
+	Title     string
+	Tags      []Tag
+	Events    []*Event
+}
+
+func NewCollection(t CollectionType) *Collection {
+	return &Collection{
+		Type:   t,
+		Events: make([]*Event, 0),
+	}
+}
+
 type Event struct {
 	From time.Time
 	To   time.Time
@@ -54,14 +82,14 @@ type Event struct {
 }
 
 type Page struct {
-	Header *Header
-	Events []*Event
+	Header      *Header
+	Collections []*Collection
 }
 
 func NewPage() *Page {
 	return &Page{
 		NewHeader(),
-		make([]*Event, 0),
+		make([]*Collection, 0),
 	}
 }
 
@@ -77,6 +105,7 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 	lineNumber := 0
 	pages := make([]*Page, 0)
 	page := NewPage()
+	collection := NewCollection(CollectionFree)
 	inHeader := true
 	for scanner.Scan() {
 		lineNumber++
@@ -91,6 +120,10 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 			continue
 		}
 		if line == pageBreak {
+			if collection.Type != CollectionFree || len(collection.Events) > 0 {
+				page.Collections = append(page.Collections, collection)
+			}
+			collection = NewCollection(CollectionFree)
 			oldDateFormat := page.Header.DateFormat
 			pages = append(pages, page)
 			page = NewPage()
@@ -117,12 +150,43 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 				continue
 			}
 		}
+		if strings.HasPrefix(trimmedLine, prefixGroupStart) {
+			// Group
+			if len(collection.Events) > 0 {
+				page.Collections = append(page.Collections, collection)
+			}
+			collection, err = getCollection(line, CollectionGroup)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmedLine, prefixSectionStart) {
+			// Section
+			if len(collection.Events) > 0 {
+				page.Collections = append(page.Collections, collection)
+			}
+			collection, err = getCollection(line, CollectionSection)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmedLine, prefixSectionStop) || strings.HasPrefix(trimmedLine, prefixGroupStop) {
+			// End group or section
+			page.Collections = append(page.Collections, collection)
+			collection = NewCollection(CollectionFree)
+			continue
+		}
 		if event, err := getEvent(line, page.Header); err != nil {
 			return nil, err
 		} else {
-			page.Events = append(page.Events, event)
+			collection.Events = append(collection.Events, event)
 			continue
 		}
+	}
+	if collection.Type != CollectionFree || len(collection.Events) > 0 {
+		page.Collections = append(page.Collections, collection)
 	}
 	pages = append(pages, page)
 	return &MarkWhen{pages}, nil
@@ -176,6 +240,7 @@ func getRange(dateRange string, header *Header) (time.Time, time.Time, error) {
 	index := strings.Index(dateRange, dateRangeSeparator)
 	if index == -1 {
 		// single date
+		// TODO: handle single date events
 	} else {
 		// date range
 		fromTime, err = parseTime(header.DateFormat, dateRange[:index])
@@ -188,4 +253,13 @@ func getRange(dateRange string, header *Header) (time.Time, time.Time, error) {
 		}
 	}
 	return fromTime, toTime, nil
+}
+
+func getCollection(line string, ct CollectionType) (*Collection, error) {
+	collection := NewCollection(ct)
+	if ct == CollectionGroup && strings.HasPrefix(line, " ") {
+		collection.Collapsed = true
+	}
+	// TODO: Get title tags
+	return collection, nil
 }

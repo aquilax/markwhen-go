@@ -33,7 +33,10 @@ func TestParse(t *testing.T) {
 			"title: This is a title",
 			&MarkWhen{
 				[]*Page{
-					{&Header{Title: "This is a title", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
+					{
+						&Header{Title: "This is a title", DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
 				},
 			},
 			false,
@@ -43,7 +46,10 @@ func TestParse(t *testing.T) {
 			"description: This is a description",
 			&MarkWhen{
 				[]*Page{
-					{&Header{Description: "This is a description", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
+					{
+						&Header{Description: "This is a description", DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
 				},
 			},
 			false,
@@ -69,10 +75,15 @@ dateFormat: d/M/y
 							DateFormat: euDateFormat,
 							Tags:       make(Tags),
 						},
-						[]*Event{
-							{From: mustParseTime("2023-01-01T00:00:00Z"), To: mustParseTime("2023-01-14T00:00:00Z"), Body: "Phase 1 #Exploratory"},
-							{From: mustParseTime("2023-01-15T00:00:00Z"), To: mustParseTime("2023-01-31T00:00:00Z"), Body: "Phase 2 #Implementation"},
-							{From: mustParseTime("2023-03-07T00:00:00Z"), To: mustParseTime("2023-03-10T00:00:00Z"), Body: "Phase 4 - kickoff! #Launch"},
+						[]*Collection{
+							{
+								Type: CollectionFree,
+								Events: []*Event{
+									{From: mustParseTime("2023-01-01T00:00:00Z"), To: mustParseTime("2023-01-14T00:00:00Z"), Body: "Phase 1 #Exploratory"},
+									{From: mustParseTime("2023-01-15T00:00:00Z"), To: mustParseTime("2023-01-31T00:00:00Z"), Body: "Phase 2 #Implementation"},
+									{From: mustParseTime("2023-03-07T00:00:00Z"), To: mustParseTime("2023-03-10T00:00:00Z"), Body: "Phase 4 - kickoff! #Launch"},
+								},
+							},
 						},
 					},
 				},
@@ -86,8 +97,28 @@ _-_-_break_-_-_
 title: This is a title for page 2`,
 			&MarkWhen{
 				[]*Page{
-					{&Header{Title: "This is a title for page 1", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
-					{&Header{Title: "This is a title for page 2", DateFormat: DefaultDateFormat, Tags: make(Tags)}, []*Event{}},
+					{
+						&Header{Title: "This is a title for page 1", DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
+					{
+						&Header{Title: "This is a title for page 2", DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"handles groups",
+			`group potato
+endGroup`,
+			&MarkWhen{
+				[]*Page{
+					{
+						&Header{DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{NewCollection(CollectionGroup)},
+					},
 				},
 			},
 			false,
