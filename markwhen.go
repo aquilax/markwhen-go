@@ -13,6 +13,7 @@ const (
 	dateRangeSeparator = "-"
 	pageBreak          = "_-_-_break_-_-_"
 
+	prefixTag         = "#"
 	prefixComment     = "//"
 	prefixTitle       = "title:"
 	prefixDescription = "description:"
@@ -64,7 +65,6 @@ type Collection struct {
 	Type      CollectionType
 	Collapsed bool
 	Title     string
-	Tags      []Tag
 	Events    []*Event
 }
 
@@ -95,6 +95,7 @@ func NewPage() *Page {
 
 type MarkWhen struct {
 	Pages []*Page
+	Tags  Tags
 }
 
 func Parse(reader io.Reader) (*MarkWhen, error) {
@@ -106,6 +107,7 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 	pages := make([]*Page, 0)
 	page := NewPage()
 	collection := NewCollection(CollectionFree)
+	tags := make(Tags)
 	inHeader := true
 	for scanner.Scan() {
 		lineNumber++
@@ -150,6 +152,15 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 				continue
 			}
 		}
+		if strings.HasPrefix(trimmedLine, prefixTag) {
+			// Tags
+			k, v, err := getTagDefinition(trimmedLine)
+			if err != nil {
+				return nil, err
+			}
+			tags[k] = v
+			continue
+		}
 		if strings.HasPrefix(trimmedLine, prefixGroupStart) {
 			// Group
 			if len(collection.Events) > 0 {
@@ -189,7 +200,7 @@ func Parse(reader io.Reader) (*MarkWhen, error) {
 		page.Collections = append(page.Collections, collection)
 	}
 	pages = append(pages, page)
-	return &MarkWhen{pages}, nil
+	return &MarkWhen{pages, tags}, nil
 }
 
 func getKeyValue(line string) (string, string, error) {
@@ -262,4 +273,20 @@ func getCollection(line string, ct CollectionType) (*Collection, error) {
 	}
 	// TODO: Get title tags
 	return collection, nil
+}
+
+func trimComment(line string) string {
+	index := strings.Index(line, prefixComment)
+	if index != -1 {
+		return strings.TrimSpace(line[:index])
+	}
+	return line
+}
+
+func getTagDefinition(line string) (Tag, Color, error) {
+	k, v, err := getKeyValue(line)
+	if err != nil {
+		return k, v, err
+	}
+	return k[1:], trimComment(v), err
 }

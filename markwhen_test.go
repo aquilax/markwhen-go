@@ -38,6 +38,7 @@ func TestParse(t *testing.T) {
 						[]*Collection{},
 					},
 				},
+				make(Tags),
 			},
 			false,
 		},
@@ -51,6 +52,7 @@ func TestParse(t *testing.T) {
 						[]*Collection{},
 					},
 				},
+				make(Tags),
 			},
 			false,
 		},
@@ -87,6 +89,7 @@ dateFormat: d/M/y
 						},
 					},
 				},
+				make(Tags),
 			},
 			false,
 		},
@@ -106,6 +109,7 @@ title: This is a title for page 2`,
 						[]*Collection{},
 					},
 				},
+				make(Tags),
 			},
 			false,
 		},
@@ -119,6 +123,41 @@ endGroup`,
 						&Header{DateFormat: DefaultDateFormat, Tags: make(Tags)},
 						[]*Collection{NewCollection(CollectionGroup)},
 					},
+				},
+				make(Tags),
+			},
+			false,
+		},
+		{
+			"parses tags",
+			`#potato: #cecece`,
+			&MarkWhen{
+				[]*Page{
+					{
+						&Header{DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
+				},
+				Tags{"potato": "#cecece"},
+			},
+			false,
+		},
+		{
+			"parses tags with comments",
+			`#Travel: blue
+#Education: green
+#Economics: #abc // hex color`,
+			&MarkWhen{
+				[]*Page{
+					{
+						&Header{DateFormat: DefaultDateFormat, Tags: make(Tags)},
+						[]*Collection{},
+					},
+				},
+				Tags{
+					"Travel":    "blue",
+					"Education": "green",
+					"Economics": "#abc",
 				},
 			},
 			false,
