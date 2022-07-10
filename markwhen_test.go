@@ -162,6 +162,30 @@ endGroup`,
 			},
 			false,
 		},
+		{
+			"EDTF Date example",
+			"2023-01-01 / 2023-14-01: Phase 1 #Exploratory",
+			&MarkWhen{
+				[]*Page{
+					{
+						&Header{
+							Tags:       make(Tags),
+							DateFormat: DefaultDateFormat,
+						},
+						[]*Collection{
+							{
+								Type: CollectionFree,
+								Events: []*Event{
+									{From: mustParseTime("2023-01-01T00:00:00Z"), To: mustParseTime("2023-01-14T00:00:00Z"), Body: "Phase 1 #Exploratory"},
+								},
+							},
+						},
+					},
+				},
+				make(Tags),
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

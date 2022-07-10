@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	keyValueSeparator  = ":"
-	dateRangeSeparator = "-"
-	pageBreak          = "_-_-_break_-_-_"
+	keyValueSeparator      = ":"
+	dateRangeSeparator     = "-"
+	edtfDateRangeSeparator = "/"
+	pageBreak              = "_-_-_break_-_-_"
 
 	prefixTag         = "#"
 	prefixComment     = "//"
@@ -25,7 +26,8 @@ const (
 	prefixSectionStop  = "endSection"
 
 	usDateFormat = "01/02/2006" // MM/dd/yy
-	euDateFormat = "02/01/2006" // MM/dd/yy
+	euDateFormat = "02/01/2006" // dd/MM/yy
+	edtfFormat   = "2006-02-01" // yy/MM/dd
 )
 
 type CollectionType string
@@ -244,26 +246,45 @@ func parseTime(dateFormat string, t string) (time.Time, error) {
 	return time.Parse(dateFormat, trimmedLine)
 }
 
+func edtfDateTimeParser(dt string) (time.Time, error) {
+	return time.Parse(edtfFormat, dt)
+}
+
 func getRange(dateRange string, header *Header) (time.Time, time.Time, error) {
+	dateParser := func(dt string) (time.Time, error) {
+		return parseTime(header.DateFormat, dt)
+	}
+	if fromTime, toTime, err := getDateRange(dateRange, dateRangeSeparator, dateParser); err == nil {
+		return fromTime, toTime, err
+	}
+	return getDateRange(dateRange, edtfDateRangeSeparator, edtfDateTimeParser)
+}
+
+func getDateRange(dateRange string, separator string, dateTimeParser func(string) (time.Time, error)) (time.Time, time.Time, error) {
 	var err error
 	fromTime := time.Time{}
 	toTime := time.Time{}
-	index := strings.Index(dateRange, dateRangeSeparator)
+	index := strings.Index(dateRange, separator)
 	if index == -1 {
 		// single date
-		// TODO: handle single date events
-	} else {
-		// date range
-		fromTime, err = parseTime(header.DateFormat, dateRange[:index])
+		fromTime, err = dateTimeParser(dateRange)
 		if err != nil {
 			return fromTime, toTime, err
 		}
-		toTime, err = parseTime(header.DateFormat, dateRange[index+1:])
+		toTime = fromTime.Add(time.Hour * 24)
+	} else {
+		// date range
+		fromTime, err = dateTimeParser(strings.TrimSpace(dateRange[:index]))
+		if err != nil {
+			return fromTime, toTime, err
+		}
+		toTime, err = dateTimeParser(strings.TrimSpace(dateRange[index+1:]))
 		if err != nil {
 			return fromTime, toTime, err
 		}
 	}
 	return fromTime, toTime, nil
+
 }
 
 func getCollection(line string, ct CollectionType) (*Collection, error) {
